@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo App</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+        h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+        form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        input[type="text"], input[type="search"] { flex: 1; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        button { padding: 0.5rem 1rem; border: 1px solid #ccc; border-radius: 4px; background: #f5f5f5; cursor: pointer; font-size: 1rem; }
+        button:hover { background: #e5e5e5; }
+        button.primary { background: #0066cc; color: white; border-color: #0052a3; }
+        button.primary:hover { background: #0052a3; }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; border-bottom: 1px solid #eee; }
+        li:last-child { border-bottom: none; }
+        li.completed .todo-title { text-decoration: line-through; color: #888; }
+        input[type="checkbox"] { cursor: pointer; }
+        .todo-title { flex: 1; }
+        .todo-actions { display: flex; gap: 0.25rem; }
+        button.danger { color: #d00; }
+        button.danger:hover { background: #fee; }
+        button.done { color: #0a0; }
+        button.done:hover { background: #efe; }
+        .error { color: #d00; margin-bottom: 1rem; display: none; }
+        .empty { color: #888; font-style: italic; padding: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Todo List</h1>
+    <div id="error" class="error"></div>
+    <form id="add-form">
+        <input type="text" id="title-input" placeholder="What needs to be done?" required>
+        <input type="text" id="desc-input" placeholder="Description (optional)">
+        <button type="submit" class="primary">Add</button>
+    </form>
+    <ul id="todo-list"></ul>
+
+    <script>
+        const API_BASE = '/todos';
+        const todoList = document.getElementById('todo-list');
+        const addForm = document.getElementById('add-form');
+        const titleInput = document.getElementById('title-input');
+        const descInput = document.getElementById('desc-input');
+        const errorDiv = document.getElementById('error');
+
+        async function showError(msg) {
+            errorDiv.textContent = msg;
+            errorDiv.style.display = 'block';
+            setTimeout(() => { errorDiv.style.display = 'none'; }, 3000);
+        }
+
+        async function loadTodos() {
+            try {
+                const res = await fetch(API_BASE + '/');
+                if (!res.ok) throw new Error('Failed to load todos');
+                const todos = await res.json();
+                render(todos);
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        function render(todos) {
+            todoList.innerHTML = '';
+            if (todos.length === 0) {
+                todoList.innerHTML = '<li class="empty">No todos yet.</li>';
+                return;
+            }
+            for (const todo of todos) {
+                const li = document.createElement('li');
+                li.className = todo.completed ? 'completed' : '';
+                li.innerHTML = `
+                    <input type="checkbox" ${todo.completed ? 'checked' : ''} data-id="${todo.id}">
+                    <span class="todo-title">${escapeHtml(todo.title)}</span>
+                    ${todo.description ? `<span style="font-size:0.85rem;color:#666;"> — ${escapeHtml(todo.description)}</span>` : ''}
+                    <div class="todo-actions">
+                        <button class="delete" data-id="${todo.id}" title="Delete">×</button>
+                    </div>
+                `;
+
+                const checkbox = li.querySelector('input[type="checkbox"]');
+                checkbox.addEventListener('change', () => toggleTodo(todo.id, todo.completed));
+
+                const deleteBtn = li.querySelector('.delete');
+                deleteBtn.addEventListener('click', () => deleteTodo(todo.id));
+
+                todoList.appendChild(li);
+            }
+        }
+
+        async function addTodo(title, description) {
+            try {
+                const res = await fetch(API_BASE + '/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description })
+                });
+                if (!res.ok) throw new Error('Failed to add todo');
+                await res.json();
+                titleInput.value = '';
+                descInput.value = '';
+                loadTodos();
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        async function toggleTodo(id, currentlyCompleted) {
+            try {
+                const res = await fetch(`${API_BASE}/${id}/toggle`, {
+                    method: 'POST'
+                });
+                if (!res.ok) throw new Error('Failed to toggle todo');
+                loadTodos();
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        async function deleteTodo(id) {
+            try {
+                const res = await fetch(`${API_BASE}/${id}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error('Failed to delete todo');
+                loadTodos();
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        addForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = titleInput.value.trim();
+            const description = descInput.value.trim();
+            if (!title) return;
+            addTodo(title, description);
+        });
+
+        loadTodos();
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
