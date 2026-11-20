@@ -1,5 +1,7 @@
 import sqlite3
+import os
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -16,18 +18,17 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    conn.execute(
+    conn.executescript(
         """
-        CREATE TABLE IF NOT EXISTS todos (
+        DROP TABLE IF EXISTS todos;
+        CREATE TABLE todos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             description TEXT,
             completed INTEGER NOT NULL DEFAULT 0
-        )
+        );
         """
     )
-    # Clear existing data for a fresh start
-    conn.execute("DELETE FROM todos")
     conn.commit()
     conn.close()
 
@@ -44,6 +45,11 @@ class TodoCreate(BaseModel):
 
 class Todo(TodoCreate):
     id: int
+
+
+@app.get("/")
+async def read_root():
+    return FileResponse("static/index.html")
 
 
 @app.post("/todos/", response_model=Todo)

@@ -118,3 +118,11 @@ def test_toggle_todo_not_found():
     response = client.post("/todos/999/toggle")
     assert response.status_code == 404
     assert response.json()["detail"] == "Todo not found"
+
+
+def test_root_returns_html():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "<html" in response.text
+    assert "Todo List" in response.text
